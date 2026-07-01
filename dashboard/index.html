@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distributed Task Engine — Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: monospace;
+      font-size: 13px;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    header {
+      background: #222;
+      color: #fff;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 { font-size: 14px; font-weight: normal; letter-spacing: 1px; }
+
+    #wsStatus {
+      font-size: 12px;
+      padding: 2px 8px;
+      border: 1px solid #666;
+      background: #555;
+      color: #fff;
+    }
+    #wsStatus.online { background: #2a7a2a; border-color: #3c3; }
+
+    .container { padding: 12px 16px; }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .kpi {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 10px 12px;
+    }
+
+    .kpi-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .kpi-value {
+      font-size: 22px;
+      font-weight: bold;
+      color: #222;
+    }
+
+    .kpi-sub { font-size: 10px; color: #888; margin-top: 2px; }
+
+    .section { margin-bottom: 14px; }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #444;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+    }
+
+    .queue-bar-wrap { background: #fff; border: 1px solid #ccc; padding: 10px 12px; }
+
+    .queue-bar-track {
+      width: 100%;
+      height: 10px;
+      background: #ddd;
+      margin: 6px 0;
+    }
+
+    .queue-bar-fill {
+      height: 100%;
+      background: #333;
+      width: 0%;
+      transition: width 0.5s;
+    }
+
+    .queue-stats { display: flex; gap: 20px; font-size: 11px; color: #555; }
+    .queue-stats strong { color: #222; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+
+    .panel-header {
+      background: #eee;
+      border-bottom: 1px solid #ccc;
+      padding: 6px 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #444;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .panel-body { max-height: 360px; overflow-y: auto; padding: 8px; }
+
+    .worker-block { margin-bottom: 10px; }
+
+    .worker-name {
+      font-weight: bold;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #333;
+    }
+
+    .sat-bar-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+
+    .sat-track { flex: 1; height: 8px; background: #ddd; }
+
+    .sat-fill { height: 100%; background: #444; transition: width 0.4s; }
+
+    .sat-label { font-size: 11px; color: #555; min-width: 50px; }
+
+    .thread-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 4px;
+      font-size: 11px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-BUSY         { background: #2a7a2a; }
+    .dot-IDLE         { background: #aaa; }
+    .dot-DISCONNECTED { background: #c00; }
+    .dot-ERROR        { background: #e80; }
+
+    .t-id   { min-width: 130px; color: #555; }
+    .t-job  { flex: 1; color: #222; }
+    .t-hb   { min-width: 45px; text-align: right; color: #aaa; }
+
+    .st-badge {
+      font-size: 10px;
+      padding: 1px 5px;
+      border: 1px solid #ccc;
+      color: #444;
+      background: #f0f0f0;
+    }
+
+    .st-badge-BUSY         { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+    .st-badge-IDLE         { background: #f0f0f0; color: #555; }
+    .st-badge-DISCONNECTED { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+    .st-badge-ERROR        { background: #fff3cd; color: #856404; border-color: #ffc107; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+
+    th {
+      background: #eee;
+      border-bottom: 1px solid #ccc;
+      padding: 5px 8px;
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #555;
+      position: sticky;
+      top: 0;
+    }
+
+    td {
+      padding: 4px 8px;
+      border-bottom: 1px solid #f0f0f0;
+      color: #333;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    tr:hover td { background: #fafafa; }
+
+    .ok-true  { color: #2a7a2a; font-weight: bold; }
+    .ok-false { color: #c00;    font-weight: bold; }
+
+    .empty { padding: 20px; text-align: center; color: #aaa; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>DISTRIBUTED TASK EXECUTION ENGINE</h1>
+  <div id="wsStatus">OFFLINE</div>
+</header>
+
+<div class="container">
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Busy Threads</div>
+      <div class="kpi-value" id="kBusy">0</div>
+      <div class="kpi-sub" id="kBusySub">of 0 total</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Ops / sec</div>
+      <div class="kpi-value" id="kOps">0</div>
+      <div class="kpi-sub" id="kOpsSub">0 total</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Drain Rate</div>
+      <div class="kpi-value" id="kDrain">0</div>
+      <div class="kpi-sub">jobs / sec</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Completed</div>
+      <div class="kpi-value" id="kDone">0</div>
+      <div class="kpi-sub" id="kDoneSub">0 failed</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Exceptions</div>
+      <div class="kpi-value" id="kErr">0</div>
+      <div class="kpi-sub" id="kDrops">0 drops</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Pending Jobs</div>
+      <div class="kpi-value" id="kPending">0</div>
+      <div class="kpi-sub">in queue</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Queue Progress</div>
+    <div class="queue-bar-wrap">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#555">
+        <span>Drain progress</span>
+        <span id="qPct">0%</span>
+      </div>
+      <div class="queue-bar-track">
+        <div class="queue-bar-fill" id="qFill"></div>
+      </div>
+      <div class="queue-stats">
+        <span><strong id="qPending">0</strong> pending</span>
+        <span><strong id="qDone">0</strong> completed</span>
+        <span><strong id="qTotal">0</strong> total</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <div class="section">
+      <div class="section-title">Worker Threads</div>
+      <div class="panel">
+        <div class="panel-header">
+          <span>Thread Saturation</span>
+          <span id="threadCount">0 threads</span>
+        </div>
+        <div class="panel-body" id="threadList">
+          <div class="empty">Waiting for workers...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Recent Jobs</div>
+      <div class="panel">
+        <div class="panel-header">
+          <span>Execution Log</span>
+          <span id="logCount">0 entries</span>
+        </div>
+        <div class="panel-body">
+          <table>
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Thread</th>
+                <th>OK</th>
+                <th>Ops</th>
+                <th>ms</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="logBody">
+              <tr><td colspan="6" class="empty">No jobs yet...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const fmt = n => (typeof n === 'number') ? n.toLocaleString() : (n || '-');
+  const clip = (s, n) => s && s.length > n ? s.slice(0, n) + '...' : (s || '-');
+
+  function connect() {
+    const ws = new WebSocket('ws://localhost:8081');
+
+    ws.onopen = () => {
+      $('wsStatus').textContent = 'ONLINE';
+      $('wsStatus').className = 'online';
+    };
+
+    ws.onmessage = e => {
+      try { render(JSON.parse(e.data)); }
+      catch (err) { console.error(err); }
+    };
+
+    ws.onclose = () => {
+      $('wsStatus').textContent = 'OFFLINE';
+      $('wsStatus').className = '';
+      setTimeout(connect, 3000);
+    };
+
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+
+  function render(d) {
+    $('kBusy').textContent    = fmt(d.busyThreads);
+    $('kBusySub').textContent = `of ${fmt(d.totalThreads)} total`;
+    $('kOps').textContent     = fmt(d.opsPerSec);
+    $('kOpsSub').textContent  = `${fmt(d.totalOpsCompleted)} total`;
+    $('kDrain').textContent   = fmt(d.drainRatePerSec);
+    $('kDone').textContent    = fmt(d.jobsCompleted);
+    $('kDoneSub').textContent = `${fmt(d.jobsFailed)} failed`;
+    $('kErr').textContent     = fmt(d.exceptionsCount);
+    $('kDrops').textContent   = `${fmt(d.networkDrops)} drops`;
+    $('kPending').textContent = fmt(d.jobsPending);
+
+    const total = (d.jobsPending || 0) + (d.jobsCompleted || 0);
+    const pct = total > 0 ? Math.round((d.jobsCompleted / total) * 100) : 0;
+    $('qPct').textContent  = pct + '%';
+    $('qFill').style.width = pct + '%';
+    $('qPending').textContent = fmt(d.jobsPending);
+    $('qDone').textContent    = fmt(d.jobsCompleted);
+    $('qTotal').textContent   = fmt(total);
+
+    renderThreads(d.workers || []);
+    renderLog(d.recentJobs || []);
+  }
+
+  function renderThreads(workers) {
+    if (!workers.length) {
+      $('threadList').innerHTML = '<div class="empty">Waiting for workers...</div>';
+      $('threadCount').textContent = '0 threads';
+      return;
+    }
+    let totalT = 0, html = '';
+    workers.forEach(w => {
+      const threads = w.threads || [];
+      const busy = threads.filter(t => t.status === 'BUSY').length;
+      const total = w.declaredThreads || threads.length;
+      const pct = total > 0 ? Math.round(busy / total * 100) : 0;
+      totalT += total;
+      html += `
+        <div class="worker-block">
+          <div class="worker-name">${w.workerId}</div>
+          <div class="sat-bar-wrap">
+            <div class="sat-track"><div class="sat-fill" style="width:${pct}%"></div></div>
+            <div class="sat-label">${busy}/${total} (${pct}%)</div>
+          </div>
+          ${threads.map(t => `
+            <div class="thread-row">
+              <div class="dot dot-${t.status}"></div>
+              <div class="t-id">${t.threadId}</div>
+              <span class="st-badge st-badge-${t.status}">${t.status}</span>
+              <div class="t-job">${t.currentJobId || '-'}</div>
+              <div class="t-hb">${(t.heartbeatAgeMs / 1000).toFixed(1)}s</div>
+            </div>
+          `).join('')}
+        </div>`;
+    });
+    $('threadList').innerHTML = html;
+    $('threadCount').textContent = totalT + ' threads';
+  }
+
+  function renderLog(jobs) {
+    if (!jobs.length) {
+      $('logBody').innerHTML = '<tr><td colspan="6" class="empty">No jobs yet...</td></tr>';
+      $('logCount').textContent = '0 entries';
+      return;
+    }
+    $('logBody').innerHTML = jobs.map(j => `
+      <tr>
+        <td>${j.jobId}</td>
+        <td title="${j.threadId}">${j.threadId ? j.threadId.split('-').pop() : '-'}</td>
+        <td class="ok-${j.success}">${j.success ? 'Y' : 'N'}</td>
+        <td>${fmt(j.opsCount)}</td>
+        <td>${fmt(j.execTimeMs)}</td>
+        <td title="${j.success ? j.outputSummary : j.errorMessage}">${clip(j.success ? j.outputSummary : j.errorMessage, 30)}</td>
+      </tr>`).join('');
+    $('logCount').textContent = jobs.length + ' entries';
+  }
+</script>
+
+</body>
+</html>

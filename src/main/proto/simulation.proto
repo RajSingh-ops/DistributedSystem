@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package com.quant.grpc;
+
+option java_multiple_files = true;
+option java_package = "com.quant.grpc";
+option java_outer_classname = "TasksProto";
+
+service TaskService {
+  rpc RegisterWorker   (WorkerRegistration) returns (RegistrationAck);
+  rpc SendHeartbeat    (WorkerHeartbeat)    returns (HeartbeatAck);
+  rpc PollJob          (PollRequest)        returns (JobAssignment);
+  rpc SubmitResult     (JobResult)          returns (ResultAck);
+}
+
+message WorkerRegistration {
+  string worker_id    = 1;
+  int32  thread_count = 2;
+}
+
+message RegistrationAck {
+  bool   accepted = 1;
+  string message  = 2;
+}
+
+message WorkerHeartbeat {
+  string worker_id = 1;
+  string thread_id = 2;
+  string status    = 3;
+}
+
+message HeartbeatAck {
+  bool ok = 1;
+}
+
+message PollRequest {
+  string worker_id = 1;
+  string thread_id = 2;
+}
+
+message JobAssignment {
+  string job_id       = 1;
+  string job_type     = 2;
+  int64  complexity   = 3;
+  string payload_json = 4;
+}
+
+message JobResult {
+  string job_id            = 1;
+  string worker_id         = 2;
+  string thread_id         = 3;
+  bool   success           = 4;
+  string error_message     = 5;
+  int64  execution_time_ms = 6;
+  int64  operations_count  = 7;
+  string output_summary    = 8;
+}
+
+message ResultAck {
+  bool ok = 1;
+}
